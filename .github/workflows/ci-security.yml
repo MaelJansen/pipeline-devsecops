@@ -44,6 +44,27 @@ jobs:
                 name: security-report-trivy
                 path: trivy-report-prometheus.txt
 
+            - name: Create .env file
+              run: |
+                touch .env
+                echo "PROMETHEUS_PORT=${{ secrets.PROMETHEUS_PORT }}" >> .env
+                echo "GRAFANA_ADMIN_USER=${{ secrets.GRAFANA_ADMIN_USER }}" >> .env
+                echo "GRAFANA_ADMIN_PASSWORD=${{ secrets.GRAFANA_ADMIN_PASSWORD }}" >> .env
+                echo "GRAFANA_PORT=${{ secrets.GRAFANA_PORT }}" >> .env
+                echo "WP_USER=${{ secrets.WP_USER }}" >> .env
+                echo "WP_PASSWORD=${{ secrets.WP_PASSWORD }}" >> .env
+                echo "WP_DATABASE=${{ secrets.WP_DATABASE }}" >> .env
+                echo "MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD }}" >> .env
+            
+            - name: Start services with docker compose
+              run: docker compose docker-compose.yml up -d
+            
+            - name: Health check Prometheus
+              run: curl -f http://localhost:${{ secrets.PROMETHEUS_PORT }}/ || exit 1
+
+            - name: Stop stack
+              run: docker compose down
+
             - name: Push Prometheus image to Docker Hub
               run: docker push ${{ secrets.DOCKER_USERNAME }}/prometheus:latest
 
