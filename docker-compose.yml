@@ -67,10 +67,10 @@ services:
     container_name: wordpress-db
     restart: unless-stopped
     environment:
-      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD}
-      MARIADB_DATABASE: ${WORDPRESS_DB_NAME}
-      MARIADB_USER: ${WORDPRESS_DB_USER}
-      MARIADB_PASSWORD: ${WORDPRESS_DB_PASSWORD}
+      MARIADB_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MARIADB_DATABASE: ${WP_DATABASE}
+      MARIADB_USER: ${WP_USER}
+      MARIADB_PASSWORD: ${WP_PASSWORD}
     volumes:
       - wordpress_db_data:/var/lib/mysql
     networks:
@@ -83,17 +83,15 @@ services:
     container_name: wordpress
     restart: unless-stopped
     environment:
-      WORDPRESS_DB_HOST: ${WORDPRESS_DB_HOST}
-      WORDPRESS_DB_USER: ${WORDPRESS_DB_USER}
-      WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD}
-      WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME}
-      WORDPRESS_TABLE_PREFIX: ${WORDPRESS_TABLE_PREFIX}
+      WORDPRESS_DB_USER: ${WP_USER}
+      WORDPRESS_DB_PASSWORD: ${WP_PASSWORD}
+      WORDPRESS_DB_NAME: ${WP_DATABASE}
     volumes:
       - wordpress_data:/var/www/html
     networks:
       - monitoring
     ports:
-      - "${WORDPRESS_PORT:-8080}:80"
+      - "${8080:-8080}:80"
     security_opt:
       - no-new-privileges:true
 
