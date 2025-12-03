@@ -1,1 +1,1 @@
-FROM mariadb:11.4
+FROM mariadb:lts-ubi

@@ -1,1 +1,1 @@
-FROM wordpress:6.6.2-php8.2-apache
+FROM wordpress:beta-php8.5-fpm
