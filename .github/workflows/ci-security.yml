@@ -78,11 +78,14 @@ jobs:
             
             - name: Start services with docker compose
               run: docker compose -f docker-compose.yml up -d
+
+            - name: check docker
+              run: docker ps -a
             
             - name: Health check Prometheus
               run: curl -f http://localhost:${{ secrets.PROMETHEUS_PORT }}/ || exit 1
 
-            - name: Health check Prometheus
+            - name: Health check Grafana
               run: curl -f http://localhost:${{ secrets.GRAFANA_PORT }}/ || exit 1
 
             - name: Stop stack
