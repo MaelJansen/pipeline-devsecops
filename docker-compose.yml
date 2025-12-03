@@ -45,11 +45,9 @@ services:
       - /run
 
   node-exporter:
-    image: prom/node-exporter:v1.8.2
+    build: ./node-exporter
     container_name: node-exporter
     restart: unless-stopped
-    command:
-      - "--path.rootfs=/host"
     pid: "host"
     volumes:
       - "/:/host:ro,rslave"
@@ -65,7 +63,7 @@ services:
       - /run
 
   wordpress-db:
-    image: mariadb:11.4
+    build: ./wordpress-db
     container_name: wordpress-db
     restart: unless-stopped
     environment:
@@ -81,7 +79,7 @@ services:
       - no-new-privileges:true
 
   wordpress:
-    image: wordpress:6.6.2-php8.2-apache
+    build: ./wordpress
     container_name: wordpress
     restart: unless-stopped
     environment:
