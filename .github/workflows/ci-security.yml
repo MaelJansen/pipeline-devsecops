@@ -41,7 +41,7 @@ jobs:
             - name: Upload Trivy Artifact
               uses: actions/upload-artifact@v4
               with:
-                name: security-report-trivy
+                name: security-report-trivy-prometheus
                 path: trivy-report-prometheus.txt
 
             - name: Build grafana image
@@ -61,7 +61,7 @@ jobs:
             - name: Upload Trivy Artifact
               uses: actions/upload-artifact@v4
               with:
-                name: security-report-trivy
+                name: security-report-trivy-grafana
                 path: trivy-report-grafana.txt
 
             - name: Create .env file
