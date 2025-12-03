@@ -1,0 +1,116 @@
+name: CI - DevSecOps Pipeline
+
+on:
+  push:
+    branches: ['main']
+
+env:
+  REGISTRY: docker.io
+  IMAGE_TAG: latest
+
+jobs:
+  build-secure-sign:
+    name: Build & Secure ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [prometheus, grafana, node-exporter, wordpress, wordpress-db]
+        include:
+          - service: prometheus
+            context: prometheus
+          - service: grafana
+            context: grafana
+          - service: node-exporter
+            context: node-exporter
+          - service: wordpress
+            context: wordpress
+          - service: wordpress-db
+            context: wordpress-db
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3.5.0
+
+      - name: Build Image
+        run: docker build -t ${{ secrets.DOCKER_USERNAME }}/${{ matrix.service }}:${{ env.IMAGE_TAG }} -f ${{ matrix.context }}/Dockerfile ${{ matrix.context }}/
+
+      - name: Run Trivy Scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: '${{ secrets.DOCKER_USERNAME }}/${{ matrix.service }}:${{ env.IMAGE_TAG }}'
+          format: 'table'
+          exit-code: '0'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+          output: 'trivy-report-${{ matrix.service }}.txt'
+
+      - name: Upload Trivy Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-report-${{ matrix.service }}
+          path: trivy-report-${{ matrix.service }}.txt
+
+      - name: Push Image to Docker Hub
+        run: docker push ${{ secrets.DOCKER_USERNAME }}/${{ matrix.service }}:${{ env.IMAGE_TAG }}
+
+      - name: Sign Image
+        run: cosign sign --yes --key env://COSIGN_PRIVATE_KEY ${{ secrets.DOCKER_USERNAME }}/${{ matrix.service }}:${{ env.IMAGE_TAG }}
+        env:
+          COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+
+      - name: Verify Image Signature
+        run: cosign verify --key env://COSIGN_PUBLIC_KEY ${{ secrets.DOCKER_USERNAME }}/${{ matrix.service }}:${{ env.IMAGE_TAG }}
+        env:
+          COSIGN_PUBLIC_KEY: ${{ secrets.COSIGN_PUBLIC_KEY }}
+
+  integration-test:
+    needs: build-secure-sign
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Create .env file
+        run: |
+          touch .env
+          echo "PROMETHEUS_PORT=${{ secrets.PROMETHEUS_PORT }}" >> .env
+          echo "GRAFANA_ADMIN_USER=${{ secrets.GRAFANA_ADMIN_USER }}" >> .env
+          echo "GRAFANA_ADMIN_PASSWORD=${{ secrets.GRAFANA_ADMIN_PASSWORD }}" >> .env
+          echo "GRAFANA_PORT=${{ secrets.GRAFANA_PORT }}" >> .env
+          echo "WP_USER=${{ secrets.WP_USER }}" >> .env
+          echo "WP_PASSWORD=${{ secrets.WP_PASSWORD }}" >> .env
+          echo "WP_DATABASE=${{ secrets.WP_DATABASE }}" >> .env
+          echo "MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD }}" >> .env
+
+      - name: Start services (Integration Test)
+        run: docker compose -f docker-compose.yml up -d
+
+      - name: Check Containers Status
+        run: |
+          sleep 30 # Attendre que les services démarrent
+          docker compose ps
+          if [ $(docker compose ps -q | wc -l) -lt 5 ]; then
+            echo "Certains conteneurs ne ont pas démarré !"
+            docker compose logs
+            exit 1
+          fi
+
+      - name: Stop stack
+        if: always()
+        run: docker compose down
