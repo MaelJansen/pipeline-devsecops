@@ -45,7 +45,7 @@ jobs:
                 path: trivy-report-prometheus.txt
 
             - name: Build grafana image
-              run: docker build -t ${{ secrets.DOCKER_USERNAME }}/grafana:latest -f grafana/Dockerfile .
+              run: docker build -t ${{ secrets.DOCKER_USERNAME }}/grafana:latest -f grafana/Dockerfile grafana/
   
             - name: Run Trivy Scanner for grafrana image
               uses: aquasecurity/trivy-action@master
