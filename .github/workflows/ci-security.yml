@@ -139,6 +139,11 @@ jobs:
             - name: Start services with docker compose
               run: docker compose -f docker-compose.yml up -d
 
+            - name: health grafana
+              run: |
+                  sleep 30
+                  curl -f http://localhost:${GRAFANA_PORT}/ || exit 1
+
             - name: Debug Grafana Logs
               if: failure()
               run: docker logs grafana exit 1
