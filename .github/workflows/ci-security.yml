@@ -142,7 +142,7 @@ jobs:
             - name: health grafana
               run: |
                   sleep 30
-                  curl -f http://localhost:${GRAFANA_PORT}/ || exit 1
+                  curl -f http://localhost:3000/ || exit 1
 
             - name: Debug Grafana Logs
               if: failure()
