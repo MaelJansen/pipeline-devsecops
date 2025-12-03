@@ -44,6 +44,26 @@ jobs:
                 name: security-report-trivy
                 path: trivy-report-prometheus.txt
 
+            - name: Build grafana image
+              run: docker build -t ${{ secrets.DOCKER_USERNAME }}/grafana:latest -f grafana/Dockerfile grafana/
+  
+            - name: Run Trivy Scanner for grafrana image
+              uses: aquasecurity/trivy-action@master
+              with:
+                image-ref: '${{ secrets.DOCKER_USERNAME }}/grafana:latest'
+                format: 'table'
+                exit-code: '0'
+                ignore-unfixed: true
+                vuln-type: 'os,library'
+                severity: 'CRITICAL,HIGH'
+                output: 'trivy-report-grafana.txt'
+  
+            - name: Upload Trivy Artifact
+              uses: actions/upload-artifact@v4
+              with:
+                name: security-report-trivy
+                path: trivy-report-grafana.txt
+
             - name: Create .env file
               run: |
                 touch .env
@@ -62,6 +82,9 @@ jobs:
             - name: Health check Prometheus
               run: curl -f http://localhost:${{ secrets.PROMETHEUS_PORT }}/ || exit 1
 
+            - name: Health check Prometheus
+              run: curl -f http://localhost:${{ secrets.GRAFANA_PORT }}/ || exit 1
+
             - name: Stop stack
               run: docker compose down
 
@@ -78,3 +101,18 @@ jobs:
               run: cosign verify --key env://COSIGN_PUBLIC_KEY ${{ secrets.DOCKER_USERNAME }}/prometheus:latest
               env:
                 COSIGN_PUBLIC_KEY: ${{ secrets.COSIGN_PUBLIC_KEY }}
+
+            - name: Push Grafana image to Docker Hub
+              run: docker push ${{ secrets.DOCKER_USERNAME }}/grafana:latest
+
+            - name: Sign Grafana image
+              run: cosign sign --yes --key env://COSIGN_PRIVATE_KEY ${{ secrets.DOCKER_USERNAME }}/grafana:latest
+              env:
+                COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+                COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+  
+            - name: Verify Grafana image signature
+              run: cosign verify --key env://COSIGN_PUBLIC_KEY ${{ secrets.DOCKER_USERNAME }}/grafana:latest
+              env:
+                COSIGN_PUBLIC_KEY: ${{ secrets.COSIGN_PUBLIC_KEY }}
+  
