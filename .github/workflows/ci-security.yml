@@ -139,16 +139,13 @@ jobs:
             - name: Start services with docker compose
               run: docker compose -f docker-compose.yml up -d
 
-            - name: health grafana
+            - name: health infra
               run: |
+                  export $(grep -v '^#' .env | xargs)
                   sleep 15
                   curl -f http://localhost:$GRAFANA_PORT/ || exit 1
-                  
-            - name: health prometheus
-              run: |
-                  sleep 15
                   curl -f http://localhost:$PROMETHEUS_PORT/ || exit 1
-
+                  
             - name: Debug Grafana Logs
               if: failure()
               run: docker logs grafana exit 1
