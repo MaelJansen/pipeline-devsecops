@@ -64,6 +64,66 @@ jobs:
                 name: security-report-trivy-grafana
                 path: trivy-report-grafana.txt
 
+            - name: Build node-exporter image
+              run: docker build -t ${{ secrets.DOCKER_USERNAME }}/node-exporter:latest -f node-exporter/Dockerfile node-exporter/
+    
+            - name: Run Trivy Scanner for node-exporter image
+              uses: aquasecurity/trivy-action@master
+              with:
+                image-ref: '${{ secrets.DOCKER_USERNAME }}/node-exporter:latest'
+                format: 'table'
+                exit-code: '0'
+                ignore-unfixed: true
+                vuln-type: 'os,library'
+                severity: 'CRITICAL,HIGH'
+                output: 'trivy-report-node-exporter.txt'
+    
+            - name: Upload Trivy Artifact
+              uses: actions/upload-artifact@v4
+              with:
+                name: security-report-trivy-node-exporter
+                path: trivy-report-node-exporter.txt
+
+            - name: Build wordpress image
+              run: docker build -t ${{ secrets.DOCKER_USERNAME }}/wordpress:latest -f wordpress/Dockerfile wordpress/
+      
+            - name: Run Trivy Scanner for wordpress image
+              uses: aquasecurity/trivy-action@master
+              with:
+                image-ref: '${{ secrets.DOCKER_USERNAME }}/wordpress:latest'
+                format: 'table'
+                exit-code: '0'
+                ignore-unfixed: true
+                vuln-type: 'os,library'
+                severity: 'CRITICAL,HIGH'
+                output: 'trivy-report-wordpress.txt'
+      
+            - name: Upload Trivy Artifact
+              uses: actions/upload-artifact@v4
+              with:
+                  name: security-report-trivy-wordpress
+                  path: trivy-report-wordpress.txt
+            
+            - name: Build wordpress-db image
+              run: docker build -t ${{ secrets.DOCKER_USERNAME }}/wordpress-db:latest -f wordpress-db/Dockerfile wordpress-db/
+      
+            - name: Run Trivy Scanner for wordpress-db image
+              uses: aquasecurity/trivy-action@master
+              with:
+                image-ref: '${{ secrets.DOCKER_USERNAME }}/wordpress-db:latest'
+                format: 'table'
+                exit-code: '0'
+                ignore-unfixed: true
+                vuln-type: 'os,library'
+                severity: 'CRITICAL,HIGH'
+                output: 'trivy-report-wordpress-db.txt'
+      
+            - name: Upload Trivy Artifact
+              uses: actions/upload-artifact@v4
+              with:
+                  name: security-report-trivy-wordpress-db
+                  path: trivy-report-wordpress-db.txt
+  
             - name: Create .env file
               run: |
                 touch .env
@@ -79,18 +139,25 @@ jobs:
             - name: Start services with docker compose
               run: docker compose -f docker-compose.yml up -d
 
-            - name: check docker
-              run: docker ps -a
-            
-            - name: Health check Prometheus
-              run: curl -f http://localhost:${{ secrets.PROMETHEUS_PORT }}/ || exit 1
-
             - name: Debug Grafana Logs
               if: failure()
               run: docker logs grafana
 
-            - name: Health check Grafana
-              run: curl --fail --retry 10 --retry-delay 5 --retry-connrefused http://localhost:${{ secrets.GRAFANA_PORT }}/ || exit 1
+            - name: Debug Prometheus Logs
+              if: failure()
+              run: docker logs prometheus
+
+            - name: Debug node-exporter Logs
+              if: failure()
+              run: docker logs node-exporter
+
+            - name: Debug wordpress Logs
+              if: failure()
+              run: docker logs wordpress
+            
+            - name: Debug wordpress-db Logs
+              if: failure()
+              run: docker logs wordpress-db
 
             - name: Stop stack
               run: docker compose down
@@ -120,6 +187,48 @@ jobs:
   
             - name: Verify Grafana image signature
               run: cosign verify --key env://COSIGN_PUBLIC_KEY ${{ secrets.DOCKER_USERNAME }}/grafana:latest
+              env:
+                COSIGN_PUBLIC_KEY: ${{ secrets.COSIGN_PUBLIC_KEY }}
+
+            - name: Push node-exporter image to Docker Hub
+              run: docker push ${{ secrets.DOCKER_USERNAME }}/node-exporter:latest
+
+            - name: Sign node-exporter image
+              run: cosign sign --yes --key env://COSIGN_PRIVATE_KEY ${{ secrets.DOCKER_USERNAME }}/node-exporter:latest
+              env:
+                COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+                COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+  
+            - name: Verify node-exporter image signature
+              run: cosign verify --key env://COSIGN_PUBLIC_KEY ${{ secrets.DOCKER_USERNAME }}/node-exporter:latest
+              env:
+                COSIGN_PUBLIC_KEY: ${{ secrets.COSIGN_PUBLIC_KEY }}
+
+            - name: Push wordpress image to Docker Hub
+              run: docker push ${{ secrets.DOCKER_USERNAME }}/wordpress:latest
+
+            - name: Sign wordpress image
+              run: cosign sign --yes --key env://COSIGN_PRIVATE_KEY ${{ secrets.DOCKER_USERNAME }}/wordpress:latest
+              env:
+                COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+                COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+  
+            - name: Verify wordpress image signature
+              run: cosign verify --key env://COSIGN_PUBLIC_KEY ${{ secrets.DOCKER_USERNAME }}/wordpress:latest
+              env:
+                COSIGN_PUBLIC_KEY: ${{ secrets.COSIGN_PUBLIC_KEY }}
+  
+            - name: Push wordpress-db image to Docker Hub
+              run: docker push ${{ secrets.DOCKER_USERNAME }}/wordpress-db:latest
+
+            - name: Sign wordpress-db image
+              run: cosign sign --yes --key env://COSIGN_PRIVATE_KEY ${{ secrets.DOCKER_USERNAME }}/wordpress-db:latest
+              env:
+                COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+                COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+  
+            - name: Verify wordpress-db image signature
+              run: cosign verify --key env://COSIGN_PUBLIC_KEY ${{ secrets.DOCKER_USERNAME }}/wordpress-db:latest
               env:
                 COSIGN_PUBLIC_KEY: ${{ secrets.COSIGN_PUBLIC_KEY }}
   
