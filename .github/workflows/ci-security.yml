@@ -1,0 +1,80 @@
+name: CI - Build, Scan, Push & Sign
+
+on:
+    push:
+        branches: ['main']
+
+jobs:
+    build-secure-and-sign:
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+            packages: write
+            id-token: write
+        steps:
+            - name: Checkout Code
+              uses: actions/checkout@v4
+
+            - name: Login to Docker Hub
+              uses: docker/login-action@v3
+              with:
+                username: ${{ secrets.DOCKER_USERNAME }}
+                password: ${{ secrets.DOCKER_PASSWORD }}
+
+            - name: Install Cosign
+              uses: sigstore/cosign-installer@v3.5.0
+
+            - name: Build prometheus image
+              run: docker build -t ${{ secrets.DOCKER_USERNAME }}/prometheus:latest -f prometheus/Dockerfile .
+
+            - name: Run Trivy Scanner for Prometheus image
+              uses: aquasecurity/trivy-action@master
+              with:
+                image-ref: '${{ secrets.DOCKER_USERNAME }}/prometheus:latest'
+                format: 'table'
+                exit-code: '1'
+                ignore-unfixed: true
+                vuln-type: 'os,library'
+                severity: 'CRITICAL,HIGH'
+                output: 'trivy-report-prometheus.txt'
+
+            - name: Upload Trivy Artifact
+              uses: actions/upload-artifact@v4
+              with:
+                name: security-report-trivy
+                path: trivy-report-prometheus.txt
+
+            - name: Create .env file
+              run: |
+                touch .env
+                echo "PROMETHEUS_PORT=${{ secrets.PROMETHEUS_PORT }}" >> .env
+                echo "GRAFANA_ADMIN_USER=${{ secrets.GRAFANA_ADMIN_USER }}" >> .env
+                echo "GRAFANA_ADMIN_PASSWORD=${{ secrets.GRAFANA_ADMIN_PASSWORD }}" >> .env
+                echo "GRAFANA_PORT=${{ secrets.GRAFANA_PORT }}" >> .env
+                echo "WP_USER=${{ secrets.WP_USER }}" >> .env
+                echo "WP_PASSWORD=${{ secrets.WP_PASSWORD }}" >> .env
+                echo "WP_DATABASE=${{ secrets.WP_DATABASE }}" >> .env
+                echo "MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD }}" >> .env
+            
+            - name: Start services with docker compose
+              run: docker compose docker-compose.yml up -d
+            
+            - name: Health check Prometheus
+              run: curl -f http://localhost:${{ secrets.PROMETHEUS_PORT }}/ || exit 1
+
+            - name: Stop stack
+              run: docker compose down
+
+            - name: Push Prometheus image to Docker Hub
+              run: docker push ${{ secrets.DOCKER_USERNAME }}/prometheus:latest
+
+            - name: Sign Prometheus image
+              run: cosign sign --yes --key env://COSIGN_PRIVATE_KEY ${{ secrets.DOCKER_USERNAME }}/prometheus:latest
+              env:
+                COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+                COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+
+            - name: Verify Prometheus image signature
+              run: cosign verify --key env://COSIGN_PUBLIC_KEY ${{ secrets.DOCKER_USERNAME }}/prometheus:latest
+              env:
+                COSIGN_PUBLIC_KEY: ${{ secrets.COSIGN_PUBLIC_KEY }}
