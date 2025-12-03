@@ -148,23 +148,23 @@ jobs:
                   
             - name: Debug Grafana Logs
               if: failure()
-              run: docker logs grafana exit 1
+              run: docker logs grafana
 
             - name: Debug Prometheus Logs
               if: failure()
-              run: docker logs prometheus exit 1
+              run: docker logs prometheus
 
             - name: Debug node-exporter Logs
               if: failure()
-              run: docker logs node-exporter exit 1
+              run: docker logs node-exporter
 
             - name: Debug wordpress Logs
               if: failure()
-              run: docker logs wordpress exit 1
+              run: docker logs wordpress
             
             - name: Debug wordpress-db Logs
               if: failure()
-              run: docker logs wordpress-db exit 1
+              run: docker logs wordpress-db
 
             - name: Stop stack
               run: docker compose down
