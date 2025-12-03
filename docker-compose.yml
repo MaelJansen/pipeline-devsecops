@@ -28,6 +28,7 @@ services:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
       GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
       GF_INSTALL_PLUGINS: "grafana-clock-panel"
     volumes:
       - grafana_data:/var/lib/grafana
@@ -63,12 +64,40 @@ services:
       - /tmp
       - /run
 
+  wordpress-db:
+    image: mariadb:11.4
+    container_name: wordpress-db
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD}
+      MARIADB_DATABASE: ${WORDPRESS_DB_NAME}
+      MARIADB_USER: ${WORDPRESS_DB_USER}
+      MARIADB_PASSWORD: ${WORDPRESS_DB_PASSWORD}
+    volumes:
+      - wordpress_db_data:/var/lib/mysql
+    networks:
+      - monitoring
+    security_opt:
+      - no-new-privileges:true
+
   wordpress:
-    image: wordpress
+    image: wordpress:6.6.2-php8.2-apache
     container_name: wordpress
     restart: unless-stopped
-    command:
-      - '
+    environment:
+      WORDPRESS_DB_HOST: ${WORDPRESS_DB_HOST}
+      WORDPRESS_DB_USER: ${WORDPRESS_DB_USER}
+      WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD}
+      WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME}
+      WORDPRESS_TABLE_PREFIX: ${WORDPRESS_TABLE_PREFIX}
+    volumes:
+      - wordpress_data:/var/www/html
+    networks:
+      - monitoring
+    ports:
+      - "${WORDPRESS_PORT:-8080}:80"
+    security_opt:
+      - no-new-privileges:true
 
 networks:
   monitoring:
@@ -77,3 +106,5 @@ networks:
 volumes:
   prometheus_data:
   grafana_data:
+  wordpress_db_data:
+  wordpress_data:
